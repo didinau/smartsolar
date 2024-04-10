@@ -1,0 +1,177 @@
+<?php
+/*
+ * filehunter.php
+ *
+ * Copyright 2024 Dieter Naujoks <devops@naujoks.homeip.net>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ *
+ */
+
+class ClassSearch
+{
+
+	function get_json($_array)
+	{
+		return json_encode($_array,JSON_UNESCAPED_SLASHES | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+	}
+
+	function ch_dir($_path,$_rekursiv=false)
+	{
+		$ret = array();
+
+		if( is_dir($_path) )
+		{
+			if( $dh = opendir($_path) )
+			{
+				while( $fn = readdir($dh) )
+				{
+
+					if( is_file($_path."/".$fn) )
+					{
+
+						if( isNotFalse($pos = strrpos($fn,".")) )
+						{
+
+							$fext = substr($fn, $pos + 1);
+
+						}else{
+
+							$fext = "";
+
+						}
+
+						$ret[$_path . "/" . $fn] = array( "mtime" => filemtime($_path . "/" . $fn), "size" => filesize($_path . "/" . $fn), "fext" => $fext, );
+
+					}else{
+
+						if( $fn != "." and $fn != ".." )
+						{
+
+							if( $_rekursiv and is_dir($_path . "/" . $fn) )
+							{
+
+								$ret = array_merge($ret, $this->ch_dir($_path . "/" . $fn, true));
+
+							}
+						}
+					}
+				}
+
+				closedir($dh);
+
+			}
+		}
+
+		return $ret;
+
+	}
+
+	public function find_classes($_path, $_dirs, $_ext)
+	{
+		$files = array();
+
+		foreach($_dirs as $idx)
+		{
+			$files = array_merge($files, $this->ch_dir($_path.$idx,true));
+		}
+
+		$dyn_classes = array();
+
+		if( count($files) )
+			foreach($files as $idx => $val)
+		{
+			if( in_array($val["fext"], $_ext) or in_array("*", $_ext) )
+			{
+				$dyn_classes = array_merge_recursive($dyn_classes, $this->parse_file($idx, $_path));
+			}
+		}
+		return $dyn_classes;
+	}
+
+	function get_needle($_src)
+	{
+		return is_array($_src) ? $_src[1]:$_src;
+	}
+
+	function parse_file($_file, $_path)
+	{
+		$result		= array();
+		$namespace	= "";
+		$ptoken		= token_get_all(php_strip_whitespace($_file));
+
+		for($i = 0; $i<count($ptoken); $i++)
+		{
+
+			$needle = $this->get_needle($ptoken[$i]);
+
+			$needle_ = strtolower($needle);
+
+			if( $needle_ == "namespace" and isset($ptoken[$i+2]) and $this->get_needle($ptoken[$i+1]) == " " )
+			{
+
+				$s = 2;
+
+				$namespace = "";
+
+				while(isset($ptoken[$i + $s]))
+				{
+					$n = $this->get_needle($ptoken[$i + $s]);
+					if( $n == ";" )
+					{
+
+						break;
+
+					}else{
+
+						$namespace .= $n;
+
+					}
+
+					$s++;
+
+				}
+
+				$i += $s;
+
+				$namespace .= "\\";
+
+			}
+
+			if(
+				in_array($needle_, ProjectIncluderConfig::$suitableObjects)
+				and isset($ptoken[$i + 2])
+				and isset($ptoken[$i + 1][1])
+				and $ptoken[$i + 1][1] == " "
+			)
+			{
+
+				if( is_array($ptoken[$i + 2]) )
+				{
+
+					$result[$namespace.$ptoken[$i + 2][1]] = substr($_file, strlen($_path));
+
+					$i += 2;
+
+				}
+			}
+		}
+		return $result;
+	}
+}
+
+?>
