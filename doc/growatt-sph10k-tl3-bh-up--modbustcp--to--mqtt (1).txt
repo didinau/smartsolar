@@ -1,0 +1,413 @@
+/**
+ * Growatt SPH 10.000 TL-3 BH-UP (3 Phase with LiPo4 Battery)
+ * Source-Code written by Michael Rack <mail+growatt-modbustcp@michaelrack.de>
+ * 
+ * Project Description: https://www.photovoltaikforum.com/thread/192228-growatt-sph-modbus-rtu-rj45-pinout-und-register-beschreibung/
+ */
+
+const net = require('net');
+const util = require('util');
+
+const debug = false;
+
+// create mqtt client
+const mqtt = require('mqtt');
+const mqttclient  = mqtt.connect('mqtt://127.0.0.1', {
+    'username': 'xxxxxx',       // MQTT Username
+    'password': 'xxxxxx',       // MQTT Password
+    'keepalive': 60
+});
+
+const socket = new net.Socket();
+const options = {
+    'host' : '192.168.99.93',   // IP of Modbus-TCP Device
+    'port' : 5000               // TCP-Port of Modbus-TCP Device
+}
+
+// Await Delay function
+function delay(time)
+{
+    return new Promise(resolve => setTimeout(resolve, time));
+}
+
+Number.prototype.pad = function(size) {
+    var s = String(this);
+    while (s.length < (size || 2)) {s = "0" + s;}
+    return s;
+}
+
+const data = new Object();
+var requests = [
+    { 'name': 'firstHoldingRegister',
+      'data': new Uint8Array([0x01, 0x03, 0x00, 0x00, 0x00, 0x78, 0x45, 0xE8]),
+      'frequency': 60 * 3 * 1000,
+      'lastupdate': null
+    },
+    { 'name': 'secondHoldingRegister',
+      'data': new Uint8Array([0x01, 0x03, 0x03, 0xE8, 0x00, 0x7D, 0x05, 0x9B]),
+      'frequency': 60 * 3 * 1000,
+      'lastupdate': null
+    },
+    { 'name': 'firstInputRegister',
+      'data': new Uint8Array([0x01, 0x04, 0x00, 0x00, 0x00, 0x7D, 0x30, 0x2B]),
+      'frequency': 5 * 1000,
+      'lastupdate': null
+    },
+    { 'name': 'secondInputRegister',
+      'data': new Uint8Array([0x01, 0x04, 0x03, 0xE8, 0x00, 0x7D, 0xB0, 0x5B]),
+      'frequency': 5 * 1000,
+      'lastupdate': null
+    }
+];
+var request = null;
+var loopTimer = null;
+
+function updateData()
+{
+    // If a request is in progress, we have to wait
+    if( request !== null )
+        return;
+
+    // Find next register to update
+    let updateobject = null;
+    let current_timestamp = (new Date()).getTime();
+    let next_update = null;
+    requests.every(element => {
+        if ( element.lastupdate === null ) {
+            // Element was never updated
+            updateobject = element;
+            if( debug ) console.log('Never updated do it immedealtey', element);
+            return false;
+
+        } else if ( updateobject && element.lastupdate + element.frequency <= updateobject.lastupdate + updateobject.frequency ) {
+            // Element needs urgent update
+            if( debug ) console.log('Urgent update', element);
+            updateobject = element;
+
+        } else if ( element.lastupdate + element.frequency <= current_timestamp ) {
+            // Element needs update
+            if( debug ) console.log('Normal update', element);
+            updateobject = element;
+
+        } else if( !next_update || (next_update && next_update >= element.lastupdate + element.frequency) ) {
+            // There is a important update outstanding
+            if( debug ) console.log('Nothing to update here, calculating next activation', element);
+            next_update = element.lastupdate + element.frequency;
+
+        }
+        return true;
+    });
+
+    // Sende den Befehl
+    if( updateobject )
+    {
+        request = updateobject;
+        socket.write( request.data );
+    }
+    else if( next_update )
+    {
+        // Wait for next activation
+        var neededTime = next_update - current_timestamp;
+        if( debug ) console.log( 'Have to wait for: ', neededTime / 1000, ' seconds');
+        loopTimer = setTimeout( () => {
+            updateData();
+
+        }, neededTime);
+    }
+}
+
+socket.on('connect', function() {
+    
+    // Request
+    updateData();
+
+});
+
+socket.on('data', (d) => {
+    if( request.data[1] === 0x03
+        && ((request.data[2] << 8) | request.data[3]) === 0x0000
+        && ((request.data[4] << 8) | request.data[5]) === 0x0078
+    ){
+        // Holding Register 0-124 (all fields default 16bit unsigned integer)
+        data.inverter = new Object();
+        data.inverter.remote_power = (d.readUInt16BE( 3 ) === 1);
+        
+        data.inverter.safty_functions = new Object();
+        data.inverter.safty_functions.spi = (d.readUInt16BE( 3 + 1 * 2 ) & 0x8000) !== 0;                        // 8. bit
+        data.inverter.safty_functions.auto_test_start = (d.readUInt16BE( 3 + 1 * 2 ) & 0x4000) !== 0;            // 7. bit
+        data.inverter.safty_functions.low_voltage_ride_through = (d.readUInt16BE( 3 + 1 * 2 ) & 0x2000) !== 0;   // 6. bit
+        data.inverter.safty_functions.freq_derating = (d.readUInt16BE( 3 + 1 * 2 ) & 0x1000) !== 0;              // 5. bit
+        data.inverter.safty_functions.softstart = (d.readUInt16BE( 3 + 1 * 2 ) & 0x0800) !== 0;                  // 4. bit
+        data.inverter.safty_functions.drms = (d.readUInt16BE( 3 + 1 * 2 ) & 0x0400) !== 0;                       // 3. bit
+        data.inverter.safty_functions.power_volt_func = (d.readUInt16BE( 3 + 1 * 2 ) & 0x0200) !== 0;            // 2. bit
+
+        data.inverter.max_active_power_percent = d.readUInt16BE( 3 + 3 * 2 );
+        data.inverter.max_reactive_power_percent = d.readUInt16BE( 3 + 4 * 2 );
+        data.inverter.max_power_w = d.readUInt16BE( 3 + 5 * 2 );
+        data.inverter.firmware = (d.subarray( 3 + 9 * 2, 3 + 9 * 2 + 5 )).toString();
+
+        data.inverter.input_start_voltage = d.readUInt16BE( 3 + 17 * 2 ) / 10;
+        data.inverter.start_after = d.readUInt16BE( 3 + 18 * 2 );
+        data.inverter.restart_delay = d.readUInt16BE( 3 + 19 * 2 );
+        data.inverter.power_slope_start_percent = d.readUInt16BE( 3 + 20 * 2 ) / 10;
+        data.inverter.power_slope_restart_percent = d.readUInt16BE( 3 + 21 * 2 ) / 10;
+        data.inverter.serial_number = (d.subarray( 3 + 23 * 2, 3 + 23 * 2 + 10 )).toString();
+        data.inverter.time = d.readUInt16BE( 3 + 45 * 2 ) +'-'+ d.readUInt16BE( 3 + 46 * 2 ).pad(2) +'-'+ d.readUInt16BE( 3 + 47 * 2 ) +'T'+ d.readUInt16BE( 3 + 48 * 2 ).pad(2) +':'+ d.readUInt16BE( 3 + 49 * 2 ).pad(2) +':'+ d.readUInt16BE( 3 + 50 * 2 ).pad(2);
+
+        // Nächsten Datensatz abrufen
+        request.lastupdate = (new Date()).getTime();
+        request = null;
+        updateData();
+
+    } else if( request.data[1] === 0x03
+        && ((request.data[2] << 8) | request.data[3]) === 0x03E8
+        && ((request.data[4] << 8) | request.data[5]) === 0x007D
+    ){
+        // Holding Register 1000-1024
+        // Growatt Inverter Modbus RTU Protocol v1.20
+        data.storage_settings = new Object();
+        data.storage_settings.max_charge_current = d.readUInt16BE( 3 + 0 * 2 );
+        
+        data.storage_settings.acid = new Object();
+        data.storage_settings.acid.lv_voltage = d.readUInt16BE( 3 + 2 * 2 ) / 10;
+        data.storage_settings.acid.low_warning_percent = d.readUInt16BE( 3 + 3 * 2 ); // 45.5V < 20% | 48.0V 20%~50% | 49.0V > 50
+        data.storage_settings.acid.stop_discarge_at = d.readUInt16BE( 3 + 4 * 2 ) / 10;
+        data.storage_settings.acid.stop_carge_at = d.readUInt16BE( 3 + 5 * 2 ) / 10;
+        data.storage_settings.acid.charge_as_long_below = d.readUInt16BE( 3 + 7 * 2 ) / 10;
+
+        // Bit-Flags
+        data.storage_settings.sysinfo = new Object();
+        //data.storage_settings.sysinfo.discharge = (d.readUInt16BE( 3 + 8 * 2 ) & 0x8000) !== 0;                        // 8. bit
+
+        /**
+         * Load First
+         */
+        data.storage_settings.load_first = new Object();
+        data.storage_settings.load_first.stop_discharge_at = d.readUInt16BE( 3 + 39 * 2 );
+        data.storage_settings.load_first.stop_charge_at = d.readUInt16BE( 3 + 41 * 2 );
+
+        data.storage_settings.load_first.time_1 = new Object();
+        data.storage_settings.load_first.time_1.start = new Object();
+        data.storage_settings.load_first.time_1.start.hour = d.readUInt8( 3 + 110 * 2 );
+        data.storage_settings.load_first.time_1.start.min = d.readUInt8( 3 + 110 * 2 + 1 );
+        data.storage_settings.load_first.time_1.end = new Object();
+        data.storage_settings.load_first.time_1.end.hour = d.readUInt8( 3 + 111 * 2 );
+        data.storage_settings.load_first.time_1.end.min = d.readUInt8( 3 + 111 * 2 + 1 );
+        data.storage_settings.load_first.time_1.enabled = (d.readUInt16BE( 3 + 112 * 2 ) > 0);
+        
+        data.storage_settings.load_first.time_2 = new Object();
+        data.storage_settings.load_first.time_2.start = new Object();
+        data.storage_settings.load_first.time_2.start.hour = d.readUInt8( 3 + 113 * 2 );
+        data.storage_settings.load_first.time_2.start.min = d.readUInt8( 3 + 113 * 2 + 1 );
+        data.storage_settings.load_first.time_2.end = new Object();
+        data.storage_settings.load_first.time_2.end.hour = d.readUInt8( 3 + 114 * 2 );
+        data.storage_settings.load_first.time_2.end.min = d.readUInt8( 3 + 114 * 2 + 1 );
+        data.storage_settings.load_first.time_2.enabled = (d.readUInt16BE( 3 + 115 * 2 ) > 0);
+
+        data.storage_settings.load_first.time_3 = new Object();
+        data.storage_settings.load_first.time_3.start = new Object();
+        data.storage_settings.load_first.time_3.start.hour = d.readUInt8( 3 + 116 * 2 );
+        data.storage_settings.load_first.time_3.start.min = d.readUInt8( 3 + 116 * 2 + 1 );
+        data.storage_settings.load_first.time_3.end = new Object();
+        data.storage_settings.load_first.time_3.end.hour = d.readUInt8( 3 + 117 * 2 );
+        data.storage_settings.load_first.time_3.end.min = d.readUInt8( 3 + 117 * 2 + 1 );
+        data.storage_settings.load_first.time_3.enabled = (d.readUInt16BE( 3 + 118 * 2 ) > 0);
+
+        /**
+         * Grid first
+         */
+        data.storage_settings.grid_first = new Object();
+        data.storage_settings.grid_first.stop_discharge_at = d.readUInt16BE( 3 + 40 * 2 );
+        data.storage_settings.grid_first.stop_charge_at = d.readUInt16BE( 3 + 42 * 2 );
+        data.storage_settings.grid_first.discharge_power_rate_percentage = d.readUInt16BE( 3 + 70 * 2 );
+        data.storage_settings.grid_first.stop_discharge_at_percentage = d.readUInt16BE( 3 + 71 * 2 );
+
+        data.storage_settings.grid_first.time_1 = new Object();
+        data.storage_settings.grid_first.time_1.start = new Object();
+        data.storage_settings.grid_first.time_1.start.hour = d.readUInt8( 3 + 80 * 2 );
+        data.storage_settings.grid_first.time_1.start.min = d.readUInt8( 3 + 80 * 2 + 1 );
+        data.storage_settings.grid_first.time_1.end = new Object();
+        data.storage_settings.grid_first.time_1.end.hour = d.readUInt8( 3 + 81 * 2 );
+        data.storage_settings.grid_first.time_1.end.min = d.readUInt8( 3 + 81 * 2 + 1 );
+        data.storage_settings.grid_first.time_1.enabled = (d.readUInt16BE( 3 + 82 * 2 ) > 0);
+        
+        data.storage_settings.grid_first.time_2 = new Object();
+        data.storage_settings.grid_first.time_2.start = new Object();
+        data.storage_settings.grid_first.time_2.start.hour = d.readUInt8( 3 + 83 * 2 );
+        data.storage_settings.grid_first.time_2.start.min = d.readUInt8( 3 + 83 * 2 + 1 );
+        data.storage_settings.grid_first.time_2.end = new Object();
+        data.storage_settings.grid_first.time_2.end.hour = d.readUInt8( 3 + 84 * 2 );
+        data.storage_settings.grid_first.time_2.end.min = d.readUInt8( 3 + 84 * 2 + 1 );
+        data.storage_settings.grid_first.time_2.enabled = (d.readUInt16BE( 3 + 85 * 2 ) > 0);
+
+        data.storage_settings.grid_first.time_3 = new Object();
+        data.storage_settings.grid_first.time_3.start = new Object();
+        data.storage_settings.grid_first.time_3.start.hour = d.readUInt8( 3 + 86 * 2 );
+        data.storage_settings.grid_first.time_3.start.min = d.readUInt8( 3 + 86 * 2 + 1 );
+        data.storage_settings.grid_first.time_3.end = new Object();
+        data.storage_settings.grid_first.time_3.end.hour = d.readUInt8( 3 + 87 * 2 );
+        data.storage_settings.grid_first.time_3.end.min = d.readUInt8( 3 + 87 * 2 + 1 );
+        data.storage_settings.grid_first.time_3.enabled = (d.readUInt16BE( 3 + 88 * 2 ) > 0);
+
+        /**
+         * Battery First
+         */
+        data.storage_settings.battery_first = new Object();
+        data.storage_settings.battery_first.charge_rate_percent = d.readUInt16BE( 3 + 90 * 2 );
+        data.storage_settings.battery_first.stop_charge_soc = d.readUInt16BE( 3 + 91 * 2 );
+        data.storage_settings.battery_first.ac_charge = (d.readUInt16BE( 3 + 92 * 2 ) > 0);
+
+        data.storage_settings.battery_first.time_1 = new Object();
+        data.storage_settings.battery_first.time_1.start = new Object();
+        data.storage_settings.battery_first.time_1.start.hour = d.readUInt8( 3 + 100 * 2 );
+        data.storage_settings.battery_first.time_1.start.min = d.readUInt8( 3 + 100 * 2 + 1 );
+        data.storage_settings.battery_first.time_1.end = new Object();
+        data.storage_settings.battery_first.time_1.end.hour = d.readUInt8( 3 + 101 * 2 );
+        data.storage_settings.battery_first.time_1.end.min = d.readUInt8( 3 + 101 * 2 + 1 );
+        data.storage_settings.battery_first.time_1.enabled = (d.readUInt16BE( 3 + 102 * 2 ) > 0);
+        
+        data.storage_settings.battery_first.time_2 = new Object();
+        data.storage_settings.battery_first.time_2.start = new Object();
+        data.storage_settings.battery_first.time_2.start.hour = d.readUInt8( 3 + 103 * 2 );
+        data.storage_settings.battery_first.time_2.start.min = d.readUInt8( 3 + 103 * 2 + 1 );
+        data.storage_settings.battery_first.time_2.end = new Object();
+        data.storage_settings.battery_first.time_2.end.hour = d.readUInt8( 3 + 104 * 2 );
+        data.storage_settings.battery_first.time_2.end.min = d.readUInt8( 3 + 104 * 2 + 1 );
+        data.storage_settings.battery_first.time_2.enabled = (d.readUInt16BE( 3 + 105 * 2 ) > 0);
+
+        data.storage_settings.battery_first.time_3 = new Object();
+        data.storage_settings.battery_first.time_3.start = new Object();
+        data.storage_settings.battery_first.time_3.start.hour = d.readUInt8( 3 + 106 * 2 );
+        data.storage_settings.battery_first.time_3.start.min = d.readUInt8( 3 + 106 * 2 + 1 );
+        data.storage_settings.battery_first.time_3.end = new Object();
+        data.storage_settings.battery_first.time_3.end.hour = d.readUInt8( 3 + 107 * 2 );
+        data.storage_settings.battery_first.time_3.end.min = d.readUInt8( 3 + 107 * 2 + 1 );
+        data.storage_settings.battery_first.time_3.enabled = (d.readUInt16BE( 3 + 108 * 2 ) > 0);
+
+        // Settings
+        data.storage_settings.ac_charge = (d.readUInt16BE( 3 + 43 * 2 ) > 0);
+        data.storage_settings.priority = d.readUInt16BE( 3 + 44 * 2 ); // 0 = Load, 1 = Battery, 2 = Grid
+
+        // Send MQTT
+        mqttclient.publish('growatt/dach/inventory', JSON.stringify(
+            { 'inverter': data.inverter,
+              'storage_settings': data.storage_settings
+            }
+        ));
+
+        // Nächsten Datensatz abrufen
+        request.lastupdate = (new Date()).getTime();
+        request = null;
+        updateData();
+    
+    } else if( request.data[1] === 0x04
+        && ((request.data[2] << 8) | request.data[3]) === 0x0000
+        && ((request.data[4] << 8) | request.data[5]) === 0x007D
+    ){
+        data.grid = new Object();
+        data.grid.frequency = d.readUInt16BE( 3 + 37 * 2 ) / 100;
+        data.grid.grid_voltage = [
+            d.readUInt16BE( 3 + 38 * 2 ) / 10,
+            d.readUInt16BE( 3 + 42 * 2 ) / 10,
+            d.readUInt16BE( 3 + 46 * 2 ) / 10
+        ];
+        data.grid.grid_current = [
+            d.readUInt32BE( 3 + 39 * 2 ) / 10,
+            d.readUInt32BE( 3 + 43 * 2 ) / 10,
+            d.readUInt32BE( 3 + 47 * 2 ) / 10
+        ]
+
+        data.pv = new Array();
+        data.pv.push( {
+            'voltage': d.readUInt16BE( 3 + 3 * 2 ) * 0.1,
+            'current': d.readUInt16BE( 3 + 4 * 2 ) * 0.1,
+            'power': d.readUInt32BE( 3 + 5 * 2 ) * 0.1
+        });
+        data.pv.push( {
+            'voltage': d.readUInt16BE( 3 + 7 * 2 ) * 0.1,
+            'current': d.readUInt16BE( 3 + 8 * 2 ) * 0.1,
+            'power': d.readUInt32BE( 3 + 9 * 2 ) * 0.1
+        });
+        
+        // Nächsten Datensatz abrufen
+        request.lastupdate = (new Date()).getTime();
+        request = null;
+        updateData();
+        
+    } else if( request.data[1] === 0x04                             //    4 = Input Register
+        && ((request.data[2] << 8) | request.data[3]) === 0x03E8    // 1000 = Start Register
+        && ((request.data[4] << 8) | request.data[5]) === 0x007D    //  125 = Length
+    ){
+        data.battery = new Object();
+        data.battery.discharge_watt = d.readUInt16BE( 3 + 10 * 2 ) / 10;
+        data.battery.charge_watt = d.readUInt16BE( 3 + 12 * 2 ) / 10;
+        data.battery.voltage = d.readUInt16BE( 3 + 87 * 2 ) / 10;
+        data.battery.current = d.readUInt16BE( 3 + 88 * 2 ) / 10;
+        data.battery.soc = d.readUInt16BE( 3 + 86 * 2 );
+        data.battery.temp = d.readUInt16BE( 3 + 89 * 2 ) / 10;
+        
+        data.grid.import = new Object();
+        //data.grid.import.l1_watt = ((d.readUInt16BE( 3 + 15 * 2 ) << 16) | d.readUInt16BE( 3 + 16 * 2 )) / 10;
+        data.grid.import.l1_watt = d.readUInt32BE( 3 + 15 * 2 ) / 10;
+        //data.grid.import.l2_watt = ((d.readUInt16BE( 3 + 17 * 2 ) << 16) | d.readUInt16BE( 3 + 18 * 2 )) / 10;
+        data.grid.import.l2_watt = d.readUInt32BE( 3 + 17 * 2 ) / 10;
+        //data.grid.import.l3_watt = ((d.readUInt16BE( 3 + 19 * 2 ) << 16) | d.readUInt16BE( 3 + 20 * 2 )) / 10;
+        data.grid.import.l3_watt = d.readUInt32BE( 3 + 19 * 2 ) / 10; 
+        data.grid.import.total = ((d.readUInt16BE( 3 + 21 * 2 ) << 16) | d.readUInt16BE( 3 + 22 * 2 )) / 10;
+
+        data.grid.export = new Object();
+        data.grid.export.l1_watt = d.readUInt32BE( 3 + 23 * 2 ) / 10;
+        data.grid.export.l2_watt = d.readUInt32BE( 3 + 25 * 2 ) / 10;
+        data.grid.export.l3_watt = d.readUInt32BE( 3 + 27 * 2 ) / 10;
+        data.grid.export.total = d.readUInt32BE( 3 + 29 * 2 ) / 10;
+
+        data.ups = new Object();
+        data.ups.frequency = d.readUInt16BE( 3 + 67 * 2 ) / 10;
+        data.ups.l1_voltage = d.readUInt16BE( 3 + 68 * 2 ) / 10;
+        data.ups.l1_current = d.readUInt16BE( 3 + 67 * 2 ) / 10;
+        data.ups.l2_voltage = d.readUInt16BE( 3 + 72 * 2 ) / 10;
+        data.ups.l2_current = d.readUInt16BE( 3 + 73 * 2 ) / 10;
+        data.ups.l3_voltage = d.readUInt16BE( 3 + 76 * 2 ) / 10;
+        data.ups.l3_current = d.readUInt16BE( 3 + 77 * 2 ) / 10;
+        data.ups.load = d.readUInt16BE( 3 + 80 * 2 );
+        data.ups.power_factor = d.readUInt16BE( 3 + 81 * 2 ) / 10;
+
+        data.energy = new Object();
+        data.energy.to_user = new Object();
+        data.energy.to_user.today = d.readInt32BE( 3 + 44 * 2 ) / 10;
+        data.energy.to_user.total = d.readInt32BE( 3 + 46 * 2 ) / 10;
+        
+        data.energy.to_grid = new Object();
+        data.energy.to_grid.today = d.readInt32BE( 3 + 48 * 2 ) / 10;
+        data.energy.to_grid.total = d.readInt32BE( 3 + 50 * 2 ) / 10;
+
+        data.energy.discarge = new Object();
+        data.energy.discarge.today = d.readInt32BE( 3 + 52 * 2 ) / 10;
+        data.energy.discarge.total = d.readInt32BE( 3 + 54 * 2 ) / 10;
+
+        data.energy.charge = new Object();
+        data.energy.charge.today = d.readInt32BE( 3 + 56 * 2 ) / 10;
+        data.energy.charge.total = d.readInt32BE( 3 + 58 * 2 ) / 10;
+
+        data.energy.load = new Object();
+        data.energy.load.today = d.readInt32BE( 3 + 60 * 2 ) / 10;
+        data.energy.load.total = d.readInt32BE( 3 + 62 * 2 ) / 10;
+
+        // Send MQTT
+        mqttclient.publish('growatt/dach/sensors', JSON.stringify(
+            { 'grid': data.grid,
+              'pv': data.pv,
+              'battery': data.battery,
+              'ups': data.ups,
+              'energy': data.energy
+            }
+        ));
+
+        // Nächsten Datensatz abrufen
+        request.lastupdate = (new Date()).getTime();
+        request = null;
+        updateData();
+    }
+});
+
+socket.connect(options);
