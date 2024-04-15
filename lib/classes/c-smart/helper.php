@@ -455,6 +455,8 @@ class helper //extends smartsql
 
 		$this->smart->DB = new dpdo_mysql($this->smart->CONFIG["dbhost"], $this->smart->CONFIG["dbuser"], $this->smart->CONFIG["dbpwd"], $this->smart->CONFIG["dbname"]);
 
+		$this->checkDatabase();
+
 	}
 
 	public function sql_dbclose()
@@ -502,10 +504,11 @@ class helper //extends smartsql
 		if( $this->smart->DB )
 		{
 
-			if( $this->smart->DB->connection_time() > (4 * sec_per_hour) )
+			if( $this->smart->DB->connection_time() > $this->smart->CONFIG["lifetime_db_obj"] )
 			{
 
-				$this->smart->DB->reconnect();
+				if( $this->smart->DB->reconnect() )
+					$this->checkDatabase();
 
 			}
 

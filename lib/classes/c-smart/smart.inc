@@ -15,6 +15,15 @@ class smart
 
 	public $cfg_file	= false;
 
+	public $cfg_def_ints= [
+
+				"config_ftime"			=> [ "min" => 0,	"max" => null,	"def" => 0		],
+				"SaveStaticDataIv"		=> [ "min" => 300,	"max" => null,	"def" => 300	],
+				"lifetime_smart_obj"	=> [ "min" => 0,	"max" => null,	"def" => 0		],
+				"lifetime_db_obj"		=> [ "min" => 0,	"max" => null,	"def" => 14400	],
+
+				 ];
+
 
 	function __construct($_cfg, $_debug = false)
 	{
@@ -45,10 +54,6 @@ class smart
 		$this->updatePrognose();
 
 		$this->controlData->prognose = &$GLOBALS["prognose"];
-
-		$this->ShouldEnd = time() + 86400;
-
-		$this->HELPER->checkDatabase();
 
 	}
 
@@ -227,15 +232,25 @@ class smart
 	public function checkVars()
 	{
 
-		if(! isset($this->controlData->STATIC["config_ftime"]) )
-			$this->controlData->STATIC["config_ftime"] = 0;
+		foreach($this->cfg_def_ints as $idx => $vals)
+		{
 
-		if(! isset($this->controlData->CONFIG["SaveStaticDataIv"]) )
-			$this->controlData->CONFIG["SaveStaticDataIv"] = 300;
+			if(! isset($this->controlData->CONFIG[$idx]) )
+			{
 
-		if( intval($this->controlData->CONFIG["SaveStaticDataIv"]) < 10)
-			$this->controlData->CONFIG["SaveStaticDataIv"] = 300;
+				$this->controlData->CONFIG[$idx] = $vals["def"];
 
+			}else{
+
+				$val = intval( $this->controlData->CONFIG[$idx] );
+
+				if( ( ! is_null($vals["min"]) and $val < $vals["min"] ) or ( ! is_null($vals["max"]) and $val > $vals["max"] ) )
+					$this->controlData->CONFIG[$idx] = $vals["def"];
+				else
+					$this->controlData->CONFIG[$idx] = $val;
+
+			}
+		}
 	}
 
 	public function configCheckOverwrite()
@@ -403,7 +418,11 @@ class smart
 				}
 
 				$this->checkVars();
+
 				$this->getDeviceList();
+
+				if( $this->controlData->CONFIG["lifetime_smart_obj"] > 0 and $this->ShouldEnd == 0 )
+					$this->ShouldEnd = time() + $this->controlData->CONFIG["lifetime_smart_obj"];
 
 			}
 		}
@@ -912,7 +931,7 @@ class smart
 
 				}
 
-				if( time() > $this->ShouldEnd )
+				if( $this->ShouldEnd > 0 and $time > $this->ShouldEnd )
 					return;
 
 			}
