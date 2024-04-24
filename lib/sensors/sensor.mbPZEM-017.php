@@ -1,5 +1,28 @@
 <?php
 
+/*	240416
+ *
+ *
+ * Copyright 2024 Dieter Naujoks <dnaujoks@naujoks.homeip.net>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ *
+ */
+
 /*
 Shunt-Wert einstellen:
 
@@ -10,7 +33,7 @@ Shunt-Wert einstellen:
 01 06 00 03 00 04 78 09 10A (interner Shunt)
 
 
-$res=$modbus->modbusQuery(1,6,3,array(0,1),true,false);
+$res = $modbus->modbusQuery(1, 6, 3, array(0, 1), true, false);
 
 //*/
 
@@ -62,10 +85,9 @@ class PZEM017 extends sensor
 
 			if( $res["request"] != $res["response"] )
 			{
-				new LogMsg(0, __class__."::".__function__, "Error set shunt (".$_wert.")\nRequ:".$res["request"]."\nResp:".$res["response"]);
+				new LogMsg(0, __class__ . "::" . __function__, "Error set shunt (" . $_wert . ")\nRequ:" . $res["request"] . "\nResp:" . $res["response"]);
 			}else{
-				if( $this->debug )
-					new LogMsg(0, __class__."::".__function__, "set shunt ".$_wert);
+				if( $this->debug ) new LogMsg(0, __class__ . "::".__function__, "set shunt " . $_wert);
 			}
 
 		}
@@ -91,19 +113,14 @@ class PZEM017 extends sensor
 		if( $this->mbOpen() )
 		{
 
-			if( isset($this->opt["shunt"]) )
-				$this->setShunt($this->opt["shunt"]);
+			if( isset($this->opt["shunt"]) ) $this->setShunt($this->opt["shunt"]);
 
 			$mbA = $this->mbReadInputReg(0,8);
 
-			if(
-				! $mbA["err"]
-				and
-				count($mbA["regs"]) == 8
-				)
+			if(! $mbA["err"] and count($mbA["regs"]) == 8 )
 			{
 
-				$this->result["publishP"]		= true;
+				$this->result["publishP"]	= true;
 
 				$this->result["i"]			= floatval($mbA["regs"][1]/100);
 
@@ -113,13 +130,13 @@ class PZEM017 extends sensor
 				$this->result["tpv"]		= floatval($mbA["regs"][4]/1000);
 				$this->result["ppv"]		= floatval($mbA["regs"][2]/10);
 
-				foreach( array("i","u") as $op )
+				foreach( array("i", "u") as $op )
 				{
 
-					if( isset($this->opt["adjust.".$op]) )
-						$this->result["r".$op] = $this->result[$op] + floatval($this->opt["adjust.".$op]);
+					if( isset($this->opt["adjust." . $op]) )
+						$this->result["r" . $op] = $this->result[$op] + floatval($this->opt["adjust." . $op]);
 					else
-						$this->result["r".$op] = $this->result[$op];
+						$this->result["r" . $op] = $this->result[$op];
 				}
 
 				$this->result["ppv1"]		= floatval($this->result["ri"] * $this->result["ru"]);
@@ -128,12 +145,12 @@ class PZEM017 extends sensor
 
 			}else{
 
-				$this->log_NoResponse(__class__."::".__function__, $this->port);
+				$this->log_NoResponse(__class__ . "::".__function__, $this->port);
 
 			}
 		}else{
 
-			new LogMsg(0, __class__."::".__function__, "error open port /dev/".$this->port);
+			new LogMsg(0, __class__ . "::".__function__, "error open port /dev/" . $this->port);
 
 		}
 		return sensor::RET_NODATA;

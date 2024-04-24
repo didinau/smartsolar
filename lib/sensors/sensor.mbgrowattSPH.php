@@ -1,5 +1,29 @@
 <?php
 
+
+/*	240416
+ *
+ *
+ * Copyright 2024 Dieter Naujoks <dnaujoks@naujoks.homeip.net>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ *
+ */
+
 class mbgrowattSPH extends sensor
 {
 	public $MinSOCRegister = array(
@@ -38,7 +62,7 @@ class mbgrowattSPH extends sensor
 				if( $wrdatum != $this->result["D"] )
 				{
 
-					new LogMsg(0, __class__."::".__function__, "WR-Datum entspricht nicht dem Query-Datum");
+					new LogMsg(0, __class__ . "::" . __function__, "WR-Datum entspricht nicht dem Query-Datum");
 
 					return sensor::RET_NODATA;
 
@@ -46,7 +70,7 @@ class mbgrowattSPH extends sensor
 
 			}else{
 
-				$this->log_NoResponse(__class__."::".__function__, $this->port);
+				$this->log_NoResponse(__class__ . "::" . __function__, $this->port);
 
 				return sensor::RET_NODATA;
 
@@ -94,6 +118,7 @@ class mbgrowattSPH extends sensor
 //>>>>>>>>>>>	Tests
 				//$this->result["more"]["ExportLimitApparentPower"]	= $this->ulng32($mbC["data"], $mbC["reg2idx"]->idx(1064), 10);		//R 1048+1049
 				#$this->result["more"]["AC Charge Power"]			= $this->ulng32($mbD["data"], $mbD["reg2idx"]->idx(1128), 10);		//R 1128+1129
+
 				$this->result["paccharge"]							= $this->ulng32($mbD["data"], $mbD["reg2idx"]->idx(1128), 10);		//R 1128+1129
 
 //*********		Output power
@@ -133,6 +158,7 @@ class mbgrowattSPH extends sensor
 				//oder
 
 				$this->result["dgridcharge"]				= $this->ulng32($mbD["data"], $mbD["reg2idx"]->idx(1124), 10);		//R 1124+1125
+
 //				$this->result["dmore"]["tgridcharge"]		= $this->ulng32($mbD["data"], $mbD["reg2idx"]->idx(1126), 10);		//R 1126+1127
 
 				$this->result["tgridcharge"]				= $this->ulng32($mbD["data"], $mbD["reg2idx"]->idx(1126), 10);		//R 1126+1127
@@ -199,7 +225,7 @@ class mbgrowattSPH extends sensor
 				if(  $this->result["dload"] == 0 )
 				{
 
-					new LogMsg(0, __class__."::".__function__, "WR-Load=0");
+					new LogMsg(0, __class__ . "::" . __function__, "WR-Load=0");
 
 					return sensor::RET_ERROR;
 

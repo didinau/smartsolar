@@ -95,7 +95,7 @@ Holdingregister:
 	mode
 
 02	PF CMD Set Holding memory	register3,4,5,99 CMD state will be memory or not(1/0),
-	if not, these settings are the initial value.W0or10Means these settings will be
+	if not, these settings are the initial value.W0or10 Means these settings will be
 	acting or not when next power on
 
 03	Active Rate
@@ -107,7 +107,7 @@ Holdingregister:
 	Inverter max output reactive power percent -100-100 % or 255
 
 05 Power factor Inverter output power
-	factor’s 10000 timesW0-20000, 0-10000 is underexcited, other is overexcited
+	factor’s 10000 times W0-20000, 0-10000 is underexcited, other is overexcited
 
 
 */
@@ -115,14 +115,14 @@ Holdingregister:
 
 class special_SPHsettings extends sensor
 {
-	protected $SOCTab			=array(	1=>40, 2=>40, 3=>40, 4=>40, 5=>40, 6=>40, 7=>40, 8=>40, 9=>40, 10=>40, 11=>40, 12=>40	);
+	protected $SOCTab			=array( 1 => 40, 2 => 40, 3 => 40, 4 => 40, 5 => 40, 6 => 40, 7 => 40, 8 => 40, 9 =>40, 10 => 40, 11 => 40, 12 => 40 );
 
 	protected $MinSOCAbs		=	20;
 
 	protected $MinSOCRegister	=array(
-									0=>608,
-									1=>1091,
-									2=>1071,
+									0 => 608,
+									1 => 1091,
+									2 => 1071,
 									);
 
 	protected $SOCRegister		=	1014;
@@ -130,11 +130,11 @@ class special_SPHsettings extends sensor
 	protected $ACChargeRegister	=	1128;
 
 	protected $modData			=array(
-									"minSocSet"=>false,
-									"minSocShouldSet"=>false,
-									"ProgNeed"=>15,
-									"ProgRed"=>8,
-									"ProgKorr"=>0,
+									"minSocSet" => false,
+									"minSocShouldSet" => false,
+									"ProgNeed" => 15,
+									"ProgRed" => 8,
+									"ProgKorr" => 0,
 									);
 
 	protected $ExportEnRegister	=	122;
@@ -143,35 +143,35 @@ class special_SPHsettings extends sensor
 	protected $PFRegister		=	5;
 	protected $PFModelRegister	=	89;
 	protected $PFModel			=array(
-									0=>"PF=1",
-									1=>"PF by set",
-									2=>"default PF line",
-									3=>"User PF line",
-									4=>"UnderExcited (Inda)",
-									5=>"OverExcited(Capa)",
-									6=>"Q(v)model",
-									7=>"Direct Control mode",
-									8=>"Static capacitive QV",
-									9=>"Static inductive QV",
+									0 => "PF=1",
+									1 => "PF by set",
+									2 => "default PF line",
+									3 => "User PF line",
+									4 => "UnderExcited (Inda)",
+									5 => "OverExcited(Capa)",
+									6 => "Q(v)model",
+									7 => "Direct Control mode",
+									8 => "Static capacitive QV",
+									9 => "Static inductive QV",
 									);
 
 	protected $Monat			=	false;
 	protected $Stunde			=	false;
 
 	protected $protomsgs		=array(
-									"wr"=>"SPH write register",
-									"0"=>"SPH standby",
-									"1"=>"normal operation"
+									"wr" => "SPH write register",
+									"0" => "SPH standby",
+									"1" => "normal operation"
 									);
 
 
-	function __construct($_port,$_addr,$_res)
+	function __construct($_port, $_addr, $_res)
 	{
 
 		$this->Monat=date("n");
 		$this->Stunde=date("G");
 
-		parent::__construct($_port,$_addr,$_res);
+		parent::__construct($_port, $_addr, $_res);
 	}
 
 	function __destruct()
@@ -181,15 +181,19 @@ class special_SPHsettings extends sensor
 
 	public static function pf_reg2val($_regval)
 	{
+
 		if( $_regval == 20000 )
 			return 1;
+
 		return ($_regval - 10000) / 10000;
 	}
 
 	public static function pf_val2reg($_val)
 	{
+
 		if( $_val == 1 )
 			return 20000;
+
 		return ($_val * 10000) + 10000;
 	}
 
@@ -256,7 +260,7 @@ class special_SPHsettings extends sensor
 			if( $this->opt["exportlimit.percent"] )
 			{
 
-				$this->modData["ExpLimSoll"]=$this->opt["exportlimit.percent"];
+				$this->modData["ExpLimSoll"] = $this->opt["exportlimit.percent"];
 
 			}else{
 
@@ -345,7 +349,7 @@ class special_SPHsettings extends sensor
 			)
 		{
 
-			$this->logger("Powerfactor in Config (".$this->modData["PFSet"].") ist ungültig");
+			$this->logger("Powerfactor in Config (" . $this->modData["PFSet"] . ") ist ungültig");
 
 			$this->modData["PFSet"] = false;
 
@@ -380,7 +384,7 @@ class special_SPHsettings extends sensor
 
 		}else{
 
-			$this->logger(__CLASS__." Unbekannter WorkMode");
+			$this->logger(__CLASS__ . " Unbekannter WorkMode");
 
 			$this->modData["minSocSet"] = false;
 
@@ -408,7 +412,7 @@ class special_SPHsettings extends sensor
 			$this->modData["minSocSet"] = $this->modData["minSocSoll"];
 		}
 
-		$this->logger("Check 1: ".$this->modData["minSocSet"]);
+		$this->logger("Check 1: " . $this->modData["minSocSet"]);
 
 
 		//SOC verringern
@@ -417,7 +421,7 @@ class special_SPHsettings extends sensor
 			$this->modData["minSocSet"] = $this->modData["minSocSoll"];
 		}
 
-		$this->logger("Check 2: ".$this->modData["minSocSet"]);
+		$this->logger("Check 2: " . $this->modData["minSocSet"]);
 
 
 		//Wenn AC-Ladung, den SOC nicht erhöhen
@@ -426,7 +430,7 @@ class special_SPHsettings extends sensor
 			$this->modData["minSocSet"] = $this->modData["minSocIst"];
 		}
 
-		$this->logger("Check 3: ".$this->modData["minSocSet"]);
+		$this->logger("Check 3: " . $this->modData["minSocSet"]);
 
 
 		//nicht unter den Mindestwert
@@ -436,7 +440,7 @@ class special_SPHsettings extends sensor
 		}
 
 		//Wert ist identisch, nichts tun
-		$this->logger("Check 4: ".$this->modData["minSocSet"]);
+		$this->logger("Check 4: " . $this->modData["minSocSet"]);
 
 
 		if( $this->modData["minSocSet"] == $this->modData["minSocIst"] )
@@ -444,7 +448,7 @@ class special_SPHsettings extends sensor
 			$this->modData["minSocSet"] = false;
 		}
 
-		$this->logger("Ergebnis ".$this->modData["minSocSet"]);
+		$this->logger("Ergebnis " . $this->modData["minSocSet"]);
 
 
 		if( $this->modData["minSocSet"] and ( ($this->modData["minSocWorkMode"] == 0 and $this->modData["minSocSet"] < 13) or $this->modData["minSocSet"] > 100 ) )
@@ -458,13 +462,13 @@ class special_SPHsettings extends sensor
 			if( in_array($this->Stunde, $this->modData["minSocSetHours"]) )
 			{
 
-				$this->logger("Check 5: final ".$this->modData["minSocSet"]);
+				$this->logger("Check 5: final " . $this->modData["minSocSet"]);
 
 			}else{
 
 				$this->modData["minSocSet"] = false;
 
-				$this->logger("Check 5: ".$this->Stunde." (".implode(";", $this->modData["minSocSetHours"]).") MinSoc nur zur erlaubten Zeit ändern!");
+				$this->logger("Check 5: " . $this->Stunde . " (" . implode(";", $this->modData["minSocSetHours"]) . ") MinSoc nur zur erlaubten Zeit ändern!");
 
 			}
 		}
@@ -480,13 +484,13 @@ class special_SPHsettings extends sensor
 		for( $i = 1; $i < 13; $i++)
 		{
 			if(
-				isset($this->opt["soc.".$i])
+				isset($this->opt["soc." . $i])
 				and
-				intval($this->opt["soc.".$i])
+				intval($this->opt["soc." . $i])
 				)
 			{
 
-				$this->SOCTab[$i]=intval($this->opt["soc.".$i]);
+				$this->SOCTab[$i] = intval($this->opt["soc." . $i]);
 			}
 		}
 
@@ -503,9 +507,9 @@ class special_SPHsettings extends sensor
 		if( isset($this->opt[$idx]) )
 		{
 
-			$devs = explode(";",$this->opt["$idx"]);
+			$devs = explode(";", $this->opt["$idx"]);
 
-			$this->modData["minSocOwrt"] = mf::cleanArray($devs,"s");
+			$this->modData["minSocOwrt"] = mf::cleanArray($devs, "s");
 
 		}
 
@@ -608,18 +612,18 @@ class special_SPHsettings extends sensor
 		{
 
 			// normal >> standby
-			$res=$this->mbWriteHoldingReg(0,0);
+			$res=$this->mbWriteHoldingReg(0, 0);
 
-			$GLOBALS["smart"]->proto($this->protomsgs["0"], $this->ID,"reg 0 -> 0");
+			$GLOBALS["smart"]->proto($this->protomsgs["0"], $this->ID, "reg 0 -> 0");
 
 		}else{
 
 			mf::Sleep(1);
 
 			// standby >> normal
-			$res = $this->mbWriteHoldingReg(0,1);
+			$res = $this->mbWriteHoldingReg(0, 1);
 
-			$GLOBALS["smart"]->proto($this->protomsgs["0"], $this->ID,"reg 0 -> 1");
+			$GLOBALS["smart"]->proto($this->protomsgs["0"], $this->ID, "reg 0 -> 1");
 
 		}
 	}
@@ -633,7 +637,7 @@ class special_SPHsettings extends sensor
 
 			$res = $this->mbWriteHoldingReg($this->ExportEnRegister, $_en);
 
-			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg ".$this->ExportEnRegister." -> ".$_en);
+			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg " . $this->ExportEnRegister . " -> " . $_en);
 
 		}
 
@@ -641,7 +645,7 @@ class special_SPHsettings extends sensor
 		{
 			$res = $this->mbWriteHoldingReg($this->ExportEnRegister, $_en);
 
-			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg ".$this->ExportEnRegister." -> ".$_en);
+			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg " . $this->ExportEnRegister . " -> " . $_en);
 		}
 
 
@@ -650,9 +654,9 @@ class special_SPHsettings extends sensor
 			// limit schreiben
 			$res = $this->mbWriteHoldingReg($this->ExportRegister, $_val);
 
-			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg ".$this->ExportRegister." -> ".$_val);
+			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg " . $this->ExportRegister . " -> " . $_val);
 
-			$this->logger(__CLASS__." Set ExportLimit: Register 122/123 ".$_en."/".$_val);
+			$this->logger(__CLASS__ . " Set ExportLimit: Register 122/123 " . $_en . "/" . $_val);
 		}
 
 	}
@@ -666,9 +670,9 @@ class special_SPHsettings extends sensor
 
 			$res = $this->mbWriteHoldingReg($this->MinSOCRegister[$_WorkMode], array(0,$soc));
 
-			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg ".$this->MinSOCRegister[$_WorkMode]." -> ".$_soc);
+			$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg " . $this->MinSOCRegister[$_WorkMode] . " -> " . $_soc);
 
-			$this->logger(__CLASS__." Set SOC: Register ".$this->MinSOCRegister[$_WorkMode].", SOC ".$soc);
+			$this->logger(__CLASS__ . " Set SOC: Register " . $this->MinSOCRegister[$_WorkMode] . ", SOC " . $soc);
 
 		}
 	}
@@ -680,9 +684,9 @@ class special_SPHsettings extends sensor
 
 		$res=$this->mbWriteHoldingReg($this->PFRegister, $pf);
 
-		$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg ".$this->PFRegister." -> ".$pf);
+		$GLOBALS["smart"]->proto($this->protomsgs["wr"], $this->ID, "reg " . $this->PFRegister . " -> " . $pf);
 
-		$this->logger(__CLASS__." Set PF: Register ".$this->PFRegister.", ".$pf." (".$this->pf_reg2val($pf).")");
+		$this->logger(__CLASS__ . " Set PF: Register " . $this->PFRegister . ", " . $pf . " (" . $this->pf_reg2val($pf) . ")");
 
 	}
 
@@ -709,14 +713,14 @@ class special_SPHsettings extends sensor
 
 			$this->checkExportLimit();
 
-			$this->logger("SOC=".$this->modData["soc"].", minSOC-Soll=".$this->modData["minSocSoll"].", minSOC-Ist=".$this->modData["minSocIst"].", ACCharge=".$this->modData["accharge"].
-				", Prognose: (".( isset($this->smart->prognose["date"]) ? $this->smart->prognose["date"] : "???" ).") ".( isset($this->smart->prognose["morgen"]) ? $this->smart->prognose["morgen"] : "???" ).", ProgKorr=".$this->modData["ProgKorr"]);
-			$this->logger("\t".($this->modData["minSocSet"] ? "SetSOC=".$this->modData["minSocSet"] : "MinSoc nicht geändert"));
+			$this->logger("SOC=" . $this->modData["soc"] . ", minSOC-Soll=" . $this->modData["minSocSoll"] . ", minSOC-Ist=".$this->modData["minSocIst"] . ", ACCharge=" . $this->modData["accharge"].
+				", Prognose: (" . ( isset($this->smart->prognose["date"]) ? $this->smart->prognose["date"] : "???" ) . ") " . ( isset($this->smart->prognose["morgen"]) ? $this->smart->prognose["morgen"] : "???" ).", ProgKorr=" . $this->modData["ProgKorr"]);
+			$this->logger("\t" . ($this->modData["minSocSet"] ? "SetSOC=" . $this->modData["minSocSet"] : "MinSoc nicht geändert"));
 
-			$this->logger("LimitAktiviert=".$this->modData["ExpOn"].", LimitIst=".($this->modData["ExpLimIst"]/10)."%, LimitSoll=".($this->modData["ExpLimSoll"]/10)."%");
-			$this->logger("\t".($this->modData["ExpLimSet"] ? "SetExportLimit=".$this->modData["ExpLimSet"] : "ExportLimit nicht geändert"));
+			$this->logger("LimitAktiviert=" . $this->modData["ExpOn"] . ", LimitIst=" . ($this->modData["ExpLimIst"]/10) . "%, LimitSoll=" . ($this->modData["ExpLimSoll"]/10) . "%");
+			$this->logger("\t" . ($this->modData["ExpLimSet"] ? "SetExportLimit=" . $this->modData["ExpLimSet"] : "ExportLimit nicht geändert"));
 
-			$this->logger("PFModel=".$this->modData["PFModel"].", PowerfactorIst=".$this->modData["PFist"].", PowerfactorSoll=".$this->opt["powerfactor"]);
+			$this->logger("PFModelIst=" . $this->modData["PFModel"] . ", PFModelSoll=" . $this->PFModel[ $this->opt["pfmodel"] ] . ", PowerfactorIst=" . $this->modData["PFist"] . ", PowerfactorSoll=" . $this->opt["powerfactor"]);
 			$this->logger("\t".($this->modData["PFSet"] ? "SetPF=".$this->modData["PFSet"] : "PF nicht geändert"));
 
 
@@ -776,7 +780,7 @@ class special_SPHsettings extends sensor
 
 				foreach($this->modData["minSocOwrt"] as $dev)
 				{
-					configOverwrite("conf/batteries/".$dev."/minsoc",$this->modData["minSocSet"]);
+					configOverwrite("conf/batteries/" . $dev . "/minsoc", $this->modData["minSocSet"]);
 				}
 			}
 
